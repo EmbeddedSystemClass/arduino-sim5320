@@ -1,11 +1,8 @@
 #ifndef _SIM5320_CLIENT_HEADER_
 #define _SIM5320_CLIENT_HEADER_
 
-#include "Arduino.h"
-#include "Print.h"
-#include "Client.h"
-#include "IPAddress.h"
 #include "Sim5320.h"
+#include "Client.h"
 
 class Sim5320Client : public Client
 {
@@ -29,12 +26,8 @@ public:
     virtual uint8_t connected();
     virtual operator bool();
 
-private:
-    static uint16_t _srcport;
-    uint8_t         _sock;
 protected:
     Sim5320*        _sim;
-    bool            _connected;
 };
 
 #endif //_SIM5320_CLIENT_HEADER_

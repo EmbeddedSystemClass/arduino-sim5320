@@ -4,7 +4,7 @@
 
 Sim5320Client::Sim5320Client()
 {
-
+    _sim = NULL;
 }
 
 
@@ -20,6 +20,7 @@ Sim5320Client::~Sim5320Client()
 
 int Sim5320Client::connect(IPAddress ip, uint16_t port)
 {
+
     return _sim->TCPconnect(String(ip).c_str(), port);
 }
 
@@ -31,58 +32,33 @@ int Sim5320Client::connect(const char *host, uint16_t port)
 size_t Sim5320Client::write(uint8_t a)
 {
     return _sim->TCPsend(&a, 1);
-    // AT+CIPSEND=1,1
-    // >a
-    // Expect
-    // OK
-    // +CIPSEND: 1,1,1
 }
 
 size_t Sim5320Client::write(const uint8_t *buf, size_t size)
 {
     return _sim->TCPsend(buf, size);
-    // AT+CIPSEND=1,size
-    // >buf
-    // Expect
-    // OK
-    // +CIPSEND: 1,size,size
 }
 
 int Sim5320Client::available()
 {
     return _sim->TCPavailable();
-    // AT+CIPRXGET=4
-    // Expect
-    // +CIPRXGET: 4,size
-    return true;
 }
 
 int Sim5320Client::read()
 {
     uint8_t a;
     _sim->TCPread(&a,1);
-    // AT+CIPRXGET=1  // Get data manually and not auto.
-    // AT+CIPRXGET=2,1
-    // Expect
-    // +CIPRXGET: 2,size
-    // Data
     return a;
 }
 
 int Sim5320Client::read(uint8_t *buf, size_t size)
 {
-    _sim->TCPread(buf,size);
-    // AT+CIPRXGET=1  // Get data manually and not auto.
-    // AT+CIPRXGET=2,1
-    // Expect
-    // +CIPRXGET: 2,size
-    // Data
-    return 1;
+    return _sim->TCPread(buf,size);
 }
 
 int Sim5320Client::peek()
 {
-    return 0; //todo
+    return _sim->TCPpeek();
 }
 
 void Sim5320Client::flush()

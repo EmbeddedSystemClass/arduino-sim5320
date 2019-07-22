@@ -325,6 +325,12 @@ uint16_t Sim5320::TCPread(uint8_t *buff, uint8_t len)
     return avail;
 }
 
+uint16_t Sim5320::TCPpeek()
+{
+
+    return 0;
+}
+
 int Sim5320::available(void)
 {
     return serial->available();
@@ -350,7 +356,14 @@ void Sim5320::flush(void)
     serial->flush();
 }
 
-/********* BATTERY & ADC ********************************************/
+
+//********* RTC *********
+bool Sim5320::readRTC(uint8_t *year, uint8_t *month, uint8_t *date, uint8_t *hr, uint8_t *min, uint8_t *sec)
+{
+    sendParseReply(F("AT+CCLK?"),F("+CCLK: "),year,'/',0);
+}
+
+//********* BATTERY & ADC *********
 
 /* returns value in mV (uint16_t) */
 bool Sim5320::getBattVoltage(uint16_t *v)
@@ -817,10 +830,10 @@ bool Sim5320::sendCheckReplyQuoted(FlashStringPtr prefix, FlashStringPtr suffix,
     return (prog_char_strcmp(replybuffer, (prog_char *)reply) == 0);
 }
 
-bool Sim5320::parseReply(FlashStringPtr toreply,
-                         uint16_t *v, char divider, uint8_t index)
+
+template <class T> bool Sim5320::parseReply(FlashStringPtr toreply, T *v  , char divider, uint8_t index)
 {
-    char *p = prog_char_strstr(replybuffer, (prog_char *)toreply); // get the pointer to the voltage
+        char *p = prog_char_strstr(replybuffer, (prog_char *)toreply); // get the pointer to the voltage
     if (p == 0)
         return false;
     p += prog_char_strlen((prog_char *)toreply);
@@ -838,6 +851,7 @@ bool Sim5320::parseReply(FlashStringPtr toreply,
 
     return true;
 }
+
 
 bool Sim5320::parseReply(FlashStringPtr toreply,
                          char *v, char divider, uint8_t index)
@@ -912,9 +926,7 @@ bool Sim5320::parseReplyQuoted(FlashStringPtr toreply,
     return true;
 }
 
-bool Sim5320::sendParseReply(FlashStringPtr tosend,
-                             FlashStringPtr toreply,
-                             uint16_t *v, char divider, uint8_t index)
+template <class T> bool Sim5320::sendParseReply(FlashStringPtr tosend, FlashStringPtr toreply, T *v   , char divider, uint8_t index)
 {
     getReply(tosend);
 
@@ -925,6 +937,7 @@ bool Sim5320::sendParseReply(FlashStringPtr tosend,
 
     return true;
 }
+
 
 bool Sim5320::sendParseReply(FlashStringPtr tosend, FlashStringPtr toreply, float *f, char divider, uint8_t index)
 {

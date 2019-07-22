@@ -35,8 +35,8 @@ public:
     void flush(void);
 
     // RTC
-    //bool enableRTC(uint8_t i);
-    //bool readRTC(uint8_t *year, uint8_t *month, uint8_t *date, uint8_t *hr, uint8_t *min, uint8_t *sec);
+    bool enableRTC(uint8_t i);
+    bool readRTC(uint8_t *year, uint8_t *month, uint8_t *date, uint8_t *hr, uint8_t *min, uint8_t *sec);
 
     // Battery and ADC
     bool getADCVoltage(uint16_t *v);
@@ -66,6 +66,7 @@ public:
     bool TCPclose(void);
     bool TCPconnected(void);
     bool TCPsend(const uint8_t *packet, uint8_t len);
+    uint16_t TCPpeek(void);
     uint16_t TCPavailable(void);
     uint16_t TCPread(uint8_t *buff, uint8_t len);
 
@@ -98,15 +99,14 @@ protected:
     bool sendCheckReply(FlashStringPtr prefix, int32_t suffix, int32_t suffix2, FlashStringPtr reply, uint16_t timeout = SIM5320_DEFAULT_TIMEOUT_MS);
     bool sendCheckReplyQuoted(FlashStringPtr prefix, FlashStringPtr suffix, FlashStringPtr reply, uint16_t timeout = SIM5320_DEFAULT_TIMEOUT_MS);
 
-    bool parseReply(FlashStringPtr toreply, uint16_t *v, char divider = ',', uint8_t index = 0);
-    bool parseReply(FlashStringPtr toreply, char *v, char divider = ',', uint8_t index = 0);
-    bool parseReplyQuoted(FlashStringPtr toreply, char *v, int maxlen, char divider, uint8_t index);
+    template <class T> bool parseReply(FlashStringPtr toreply, T *v  , char divider = ',', uint8_t index = 0);
+    bool parseReply(FlashStringPtr toreply, char *v     , char divider = ',', uint8_t index = 0);
+    bool parseReply(FlashStringPtr toreply, float *f    , char divider = ',', uint8_t index = 0);
+    bool parseReplyQuoted(FlashStringPtr toreply, char *v, int maxlen, char divider = ',', uint8_t index = 0);
 
-    bool sendParseReply(FlashStringPtr tosend, FlashStringPtr toreply, uint16_t *v, char divider = ',', uint8_t index = 0);
+    template <class T> bool sendParseReply(FlashStringPtr tosend, FlashStringPtr toreply, T *v   , char divider = ',', uint8_t index = 0);
+    bool sendParseReply(FlashStringPtr tosend, FlashStringPtr toreply, float *f     , char divider = ',', uint8_t index = 0);
 
-    bool parseReply(FlashStringPtr toreply, float *f, char divider, uint8_t index);
-
-    bool sendParseReply(FlashStringPtr tosend, FlashStringPtr toreply, float *f, char divider = ',', uint8_t index = 0);
 
 private:
     uint8_t rstpin;
