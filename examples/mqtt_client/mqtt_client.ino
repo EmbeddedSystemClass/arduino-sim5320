@@ -2,16 +2,17 @@
 #include <Sim5320Client.h>
 #include <PubSubClient.h>
 
-#define FONA_RST 0
+#define SIM_RST 0
 
-Sim5320       sim(FONA_RST, Serial1);
+char*         apn = "hologram";
+Sim5320       sim(SIM_RST, Serial1);
 Sim5320Client sim_client(sim);
 PubSubClient  mqtt_client("broker.hivemq.com",1883,NULL,sim_client);
 
 
 void setup() {
   
-    pinMode(FONA_RST,OUTPUT);
+    pinMode(SIM_RST,OUTPUT);
 
     Serial.begin(115200);
     Serial1.begin(115200);
@@ -25,7 +26,7 @@ void setup() {
         Serial.println(F("Enabling GPS"));
         sim.enableGPS(true);
         Serial.println(F("Acquiring Network."));
-        if(sim.connect("hologram"))
+        if(sim.connect(apn))
         {
         Serial.println(F("Network acquired."));
         }else{
@@ -35,11 +36,11 @@ void setup() {
         Serial.println(F("Could not communicate with Sim"));
         while(1);
     }
-    
+    printMenu();
 }
 
 void loop() {
-  Serial.print(F("FONA> "));
+  Serial.print(F("SIM> "));
     while (!Serial.available())
     {
         if (sim.available())
@@ -58,20 +59,38 @@ void loop() {
         printMenu();
         break;
     }
+    case 'd':
+    {
+        Serial.println(F("Disconnecting from Network."));
+        sim.disconnect();
+        Serial.println(F("Disconnected from Network."));
+        break;
+    }
+        case 'c':
+    {
+        Serial.println(F("Acquiring Network."));
+        if(sim.connect(apn))
+        {
+        Serial.println(F("Network acquired."));
+        }else{
+        Serial.println(F("Could not acquire network."));
+        }
+        break;
+    }
     case 'm':
     {
         Serial.println("Starting MQTT Client.");
         if (sim.connected())
         {
             Serial.println(F("Connecting to HiveMQ Broker"));
-            if (mqtt_client.connect("fonaClient"))
+            if (mqtt_client.connect("simClient"))
             {
                 Serial.println(F("MQTT Client connected."));
-                Serial.println("Publishing to /fona3g -> 'online'");
-                mqtt_client.publish("/fona3g", "online");
+                Serial.println("Publishing to /sim3gPub -> 'online'");
+                mqtt_client.publish("/sim3gPub", "online");
 
-                Serial.println("Subscribing to /fona3g2 Topic");
-                mqtt_client.subscribe("/fona3g2");
+                Serial.println("Subscribing to /sim3gSub Topic");
+                mqtt_client.subscribe("/sim3gSub");
                 
                 Serial.println("Looping for MQTT");
                 int seconds = 60;
@@ -93,7 +112,7 @@ void loop() {
                     Serial.println("Sending GPS Coordinate");
                     char gpsbuffer[120];
                     sim.getGPS(0,gpsbuffer,120);
-                    mqtt_client.publish("/fona3g", gpsbuffer);
+                    mqtt_client.publish("/sim3gPub", gpsbuffer);
                     seconds = 0;
                     }
                     delay(500);
@@ -162,7 +181,9 @@ void flushSerial()
 void printMenu(void)
 {
     Serial.println(F("-------------------------------------"));
-    Serial.println(F("[m] Start MQTT Client"));
+    Serial.println(F("[d] Disconnect from network"));
+    Serial.println(F("[c] Connect to network"));
+    Serial.println(F("[m] Start MQTT Client (press '#' to interrupt)"));
     Serial.println(F("[?] Print this menu"));
     Serial.println(F("[S] create Serial passthru tunnel"));
     Serial.println(F("-------------------------------------"));
