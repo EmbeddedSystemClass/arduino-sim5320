@@ -1,8 +1,8 @@
 #ifndef _SIM5320_CLIENT_HEADER_
 #define _SIM5320_CLIENT_HEADER_
 
-#include "Sim5320.h"
-#include "Client.h"
+#include <Sim5320.h>
+#include <Client.h>
 
 class Sim5320Client : public Client
 {
@@ -15,6 +15,8 @@ public:
     uint8_t status();
     virtual int connect(IPAddress ip, uint16_t port);  
     virtual int connect(const char *host, uint16_t port);
+    virtual int connect(IPAddress ip, uint16_t port, int timeout=1000);  
+    virtual int connect(const char *host, uint16_t port, int timeout=1000);
     virtual size_t write(uint8_t);
     virtual size_t write(const uint8_t *buf, size_t size);
     virtual int available();
