@@ -29,6 +29,17 @@ int Sim5320Client::connect(const char *host, uint16_t port)
     return _sim->TCPconnect(host, port);
 }
 
+int Sim5320Client::connect(IPAddress ip, uint16_t port, int timeout)
+{
+
+    return _sim->TCPconnect(String(ip).c_str(), port);
+}
+
+int Sim5320Client::connect(const char *host, uint16_t port, int timeout)
+{
+    return _sim->TCPconnect(host, port);
+}
+
 size_t Sim5320Client::write(uint8_t a)
 {
     return _sim->TCPsend(&a, 1);

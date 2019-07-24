@@ -24,6 +24,7 @@ public:
     bool begin();
     bool connect(char *apn, char *user = NULL, char *pwd = NULL);
     bool disconnect(void);
+    bool connected();
     int16_t status(void);
     void reset(void);
 
@@ -44,15 +45,10 @@ public:
     bool getBattVoltage(uint16_t *v);
 
     // SIM query
-    //uint8_t unlockSIM(char *pin);
-    //uint8_t getSIMCCID(char *ccid);
-    //uint8_t getNetworkStatus(void);
-    //uint8_t getRSSI(void);
-
-    // Time
-    //bool enableNetworkTimeSync(bool onoff);
-    //bool enableNTPTimeSync(bool onoff, char *ntpserver = 0);
-    //bool getTime(char *buff, uint16_t maxlen);
+    uint8_t unlockSIM(char *pin);
+    uint8_t getSIMCCID(char *ccid);
+    uint8_t getNetworkStatus(void);
+    uint8_t getRSSI(void);
 
     // GPRS handling
     bool enableGPRS(bool onoff);

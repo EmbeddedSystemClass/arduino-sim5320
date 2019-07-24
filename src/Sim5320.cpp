@@ -1,5 +1,5 @@
 #include "Sim5320.h"
-#define SIM5320_DEBUG 0
+#define SIM5320_DEBUG 1
 #if SIM5320_DEBUG
 #define DEBUG_PRINT(...) Serial.print(__VA_ARGS__)
 #define DEBUG_PRINTLN(...) Serial.println(__VA_ARGS__)
@@ -91,10 +91,34 @@ bool Sim5320::connect(char *_apn, char *_user, char *_pwd)
         apnpassword = F(_pwd);
 
     uint16_t retry = 0;
-    delay(100);
-    while (!sendCheckReply(F("AT+CGATT=1"), ok_reply, 10000) && ++retry < 10)
+    delay(1000);
+    
+    // Check CGATT State.
+    uint16_t cgatt = 0;
+    sendParseReply(F("AT+CGATT?"), F("+CGATT: "), &cgatt);
+
+    if (!cgatt)
     {
-        delay(500);
+        while (!sendCheckReply(F("AT+CGATT=1"), ok_reply, 10000) && ++retry < 10)
+        {
+            delay(500);
+        }
+        if (retry >= 10)
+        {
+            return false;
+        }
+    }
+
+    // Check network open
+    uint16_t netopen = 0;
+    sendParseReply(F("AT+NETOPEN?"), F("+NETOPEN: "), &netopen);
+    readline(); // Eat OK.
+    if (netopen) // Close if open or GACT will cause an error.
+    {
+        if (!sendCheckReply(F("AT+NETCLOSE"), ok_reply, 10000))
+            return false;
+        if (!expectReply(F("+NETCLOSE: 0")))
+            return false;
     }
 
     // set bearer profile access point name
@@ -133,35 +157,26 @@ bool Sim5320::connect(char *_apn, char *_user, char *_pwd)
         }
     }
 
-    // connect in transparent
+    // Check network transparency mode
     uint16_t cipmode = 0;
-    /*sendParseReply(F("AT+CIPMODE?"), F("+CIPMODE: "), &cipmode);
+    sendParseReply(F("AT+CIPMODE?"), F("+CIPMODE: "), &cipmode);
+    readline(); // Eat OK.
 
-    if (!cipmode)
+    if (cipmode)
     {
-        if (!sendCheckReply(F("AT+CIPMODE=1"), ok_reply, 10000))
+        // connect in non transparent mode
+        if (!sendCheckReply(F("AT+CIPMODE=0"), ok_reply, 10000))
             return false;
-    }*/
+    }
 
-    // open network (?)
-    if (!sendCheckReply(F("AT+CGACT=1"), ok_reply, 10000))
-        return false;
+    // Activate network
+    /*if (!sendCheckReply(F("AT+CGACT=1"), ok_reply, 10000))
+        return false;*/
 
-    DEBUG_PRINTLN("\t--->AT+NETOPEN");
-    serial->println("AT+NETOPEN");
-    if (!expectReply(ok_reply))
+    if (!sendCheckReply(F("AT+NETOPEN"), ok_reply, 10000))
         return false;
     if (!expectReply(F("+NETOPEN: 0")))
         return false;
-
-    /*sendCheckReply(F("AT+NETOPEN"), F("OK"), 1000);
-    readline();
-    if(!sendCheckReply(F(""),F("+NETOPEN: 0"),10000))
-    {
-        return false;
-    }*/
-
-    readline(); // eat 'OK'
 
     return true;
 }
@@ -178,12 +193,27 @@ bool Sim5320::disconnect(void)
     return true;
 }
 
+bool Sim5320::connected(void)
+{
+    uint16_t cgatt = 0;
+    sendParseReply(F("AT+CGATT?"), F("+CGATT: "), &cgatt);
+    if(!cgatt)
+        return false;
+
+    uint16_t netopen = 0;
+    sendParseReply(F("AT+NETOPEN?"), F("+NETOPEN: "), &netopen);
+    if(!netopen)
+        return false;
+
+    return true;
+}
+
 int16_t Sim5320::status(void)
 {
     uint16_t state;
 
     if (!sendParseReply(F("AT+CGATT?"), F("+CGATT: "), &state))
-        return -1;
+        return 0;
 
     return state;
 }
@@ -201,17 +231,35 @@ bool Sim5320::TCPconnect(const char *server, uint16_t port)
         TCPclose();
     }
 
+    // Make sure there is no ACK prompt to avoid +IPDX Problems.
+    if (!sendCheckReply(F("AT+CIPCCFG=10,0,0,0"), ok_reply))
+        return false;
+
+    // remove +IPDX?
+    if (!sendCheckReply(F("AT+CIPHEAD=0"), ok_reply))
+        return false;
+
     // manually read data
     if (!sendCheckReply(F("AT+CIPRXGET=1"), ok_reply))
         return false;
 
-    DEBUG_PRINT(F("\tAT+CIPOPEN=1,\"TCP\",\""));
+    // Avoid RECV FROM Prompts that causes rx buffer corruption. (Can be used for rx_int)
+    if (!sendCheckReply(F("AT+CIPSRIP=0"), ok_reply))
+        return false;
+
+    String cipopen_str = "AT+CIPOPEN=0,\"TCP\",\""+String(server)+"\","+String(port);
+    if(!sendCheckReply((char*)cipopen_str.c_str(),ok_reply))
+        return false;
+    if (!expectReply(F("+CIPOPEN: 0,0")))
+        return false;
+    
+    /*DEBUG_PRINT(F("\t---> AT+CIPOPEN=0,\"TCP\",\""));
     DEBUG_PRINT(server);
     DEBUG_PRINT(F("\","));
     DEBUG_PRINT(port);
     DEBUG_PRINTLN(F(""));
 
-    serial->print(F("AT+CIPOPEN=1,\"TCP\",\""));
+    serial->print(F("AT+CIPOPEN=0,\"TCP\",\""));
     serial->print(server);
     serial->print(F("\","));
     serial->print(port);
@@ -219,20 +267,18 @@ bool Sim5320::TCPconnect(const char *server, uint16_t port)
 
     if (!expectReply(ok_reply))
         return false;
-    if (!expectReply(F("+CIPOPEN: 1,0")))
-        return false;
+    if (!expectReply(F("+CIPOPEN: 0,0")))
+        return false;*/
 
-    // looks like it was a success (?)
+    // looks like it was a success
     return true;
 }
 
 bool Sim5320::TCPclose(void)
 {
-    DEBUG_PRINTLN(F("AT+CIPCLOSE=1"));
-    serial->println(F("AT+CIPCLOSE=1"));
-    if (!expectReply(ok_reply))
+    if (!sendCheckReply(F("AT+CIPCLOSE=0"), ok_reply))
         return false;
-    if (!expectReply(F("+CIPCLOSE: 1,0")))
+    if (!expectReply(F("+CIPCLOSE: 0,0")))
         return false;
 
     return true;
@@ -241,7 +287,7 @@ bool Sim5320::TCPclose(void)
 bool Sim5320::TCPconnected(void)
 {
     uint16_t connected = 0;
-    sendParseReply(F("AT+CIPCLOSE?"), F("+CIPCLOSE: 0,"), &connected);
+    sendParseReply(F("AT+CIPCLOSE?"), F("+CIPCLOSE: "), &connected,',',0);
 
     return connected && true;
 }
@@ -250,18 +296,10 @@ bool Sim5320::TCPsend(const uint8_t *packet, uint8_t len)
 {
     serial->flush();
 
-    DEBUG_PRINT(F("AT+CIPSEND=1,"));
+    DEBUG_PRINT(F("\t---> AT+CIPSEND=0,"));
     DEBUG_PRINTLN(len);
-#ifdef Sim5320_DEBUG
-    for (uint16_t i = 0; i < len; i++)
-    {
-        DEBUG_PRINT(F(" 0x"));
-        DEBUG_PRINT(packet[i], HEX);
-    }
-#endif
-    DEBUG_PRINTLN();
 
-    serial->print(F("AT+CIPSEND=1,"));
+    serial->print(F("AT+CIPSEND=0,"));
     serial->println(len);
     readline();
 
@@ -271,11 +309,21 @@ bool Sim5320::TCPsend(const uint8_t *packet, uint8_t len)
     if (replybuffer[0] != '>')
         return false;
 
+    #ifdef SIM5320_DEBUG
+        DEBUG_PRINT("\t---> ");
+        for (uint16_t i = 0; i < len; i++)
+        {
+            DEBUG_PRINT(F(" 0x"));
+            DEBUG_PRINT(packet[i], HEX);
+        }
+        DEBUG_PRINTLN();
+    #endif
+
     serial->write((const uint8_t *)packet, len);
-    readline(1000); // wait up to 3 seconds to send the data
+    readline(1000); // Eat the OK
     DEBUG_PRINT(F("\t<--- "));
     DEBUG_PRINTLN(replybuffer);
-    readline(1000); // wait up to 3 seconds to send the data
+    readline(1000); // Eat the +CIPSEND: 0,X,X
     DEBUG_PRINT(F("\t<--- "));
     DEBUG_PRINTLN(replybuffer);
 
@@ -286,11 +334,11 @@ uint16_t Sim5320::TCPavailable(void)
 {
     uint16_t avail;
 
-    if (!sendParseReply(F("AT+CIPRXGET=4,1"), F("+CIPRXGET: 4,1,"), &avail, ',', 0))
+    if (!sendParseReply(F("AT+CIPRXGET=4,0"), F("+CIPRXGET: 4,0,"), &avail, ',', 0))
         return false;
 
-    DEBUG_PRINT(avail);
-    DEBUG_PRINTLN(F(" bytes available"));
+    //DEBUG_PRINT(avail);
+    //DEBUG_PRINTLN(F(" bytes available"));
 
     return avail;
 }
@@ -299,12 +347,13 @@ uint16_t Sim5320::TCPread(uint8_t *buff, uint8_t len)
 {
     uint16_t avail;
 
-    DEBUG_PRINT("AT+CIPRXGET=2,1,");
+    DEBUG_PRINT("\t---> AT+CIPRXGET=2,0,");
     DEBUG_PRINTLN(len);
-    serial->print(F("AT+CIPRXGET=2,1,"));
+
+    serial->print(F("AT+CIPRXGET=2,0,"));
     serial->println(len);
     readline();
-    if (!parseReply(F("+CIPRXGET: 2,1,"), &avail, ',', 0))
+    if (!parseReply(F("+CIPRXGET: 2,0,"), &avail, ',', 0))
         return false;
 
     readRaw(avail);
@@ -384,6 +433,46 @@ bool Sim5320::getADCVoltage(uint16_t *v)
 {
     return sendParseReply(F("AT+CADC?"), F("+CADC: 1,"), v);
 }
+
+// SIM Card
+    uint8_t Sim5320::unlockSIM(char *pin)
+    {
+        char buff[14] = "AT+CPIN=";
+        memcpy(&(buff[8]), pin, 4);
+        buff[12] = '\0';
+
+        return sendCheckReply(buff, ok_reply);
+    }
+
+    uint8_t Sim5320::getSIMCCID(char *ccid)
+    {
+        getReply(F("AT+CCID"));
+        strncpy(ccid, replybuffer + 8, 20);
+        ccid[20] = 0;
+        readline(); // eat 'OK'
+
+        return strlen(ccid);
+    }
+
+    uint8_t Sim5320::getNetworkStatus(void)
+    {
+        uint16_t status;
+
+        if (!sendParseReply(F("AT+CREG?"), F("+CREG: "), &status, ',', 1))
+            return 0;
+
+        return status;
+    }
+
+    uint8_t Sim5320::getRSSI(void)
+    {
+        uint16_t reply;
+
+        if (!sendParseReply(F("AT+CSQ"), F("+CSQ: "), &reply))
+            return 0;
+
+        return reply;
+    }
 
 // GPS
 
